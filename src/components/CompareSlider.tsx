@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Eye, ChevronsLeftRight, SplitSquareVertical, Columns } from "lucide-react";
 
 interface CompareSliderProps {
@@ -100,10 +100,17 @@ export const CompareSlider: React.FC<CompareSliderProps> = ({
         </button>
       </div>
 
-      {/* Main Preview Container */}
+      {/* Main Preview Container - Canvases are NEVER unmounted */}
       <div
         ref={containerRef}
-        className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black/40 flex items-center justify-center min-h-[360px] md:min-h-[500px]"
+        className={`relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black/40 min-h-[360px] md:min-h-[500px] ${
+          viewMode === "side"
+            ? "grid grid-cols-1 md:grid-cols-2 gap-3 p-3 items-center"
+            : "flex items-center justify-center cursor-ew-resize"
+        }`}
+        onPointerDown={viewMode === "split" ? handlePointerDown : undefined}
+        onPointerMove={viewMode === "split" ? handlePointerMove : undefined}
+        onPointerUp={viewMode === "split" ? handlePointerUp : undefined}
       >
         {isProcessing && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs">
@@ -112,45 +119,65 @@ export const CompareSlider: React.FC<CompareSliderProps> = ({
           </div>
         )}
 
-        {/* View Mode: Split Slider */}
+        {/* Box 1: Original Canvas (Order first in side mode) */}
+        <div
+          className={
+            viewMode === "side"
+              ? "relative rounded-xl overflow-hidden border border-slate-800 bg-black/50 flex flex-col items-center justify-center p-2 w-full h-full order-first"
+              : "absolute inset-0 flex justify-center items-center pointer-events-none overflow-hidden z-10"
+          }
+          style={
+            viewMode === "split"
+              ? {
+                  clipPath: isHoldingOriginal
+                    ? "inset(0% 0% 0% 0%)"
+                    : `inset(0% ${100 - sliderPos}% 0% 0%)`,
+                }
+              : { clipPath: "none" }
+          }
+        >
+          {viewMode === "side" && (
+            <span className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-md text-xs font-semibold text-slate-300 px-2.5 py-1 rounded-md border border-white/10">
+              원본 (Before)
+            </span>
+          )}
+          <canvas
+            ref={originalCanvasRef}
+            className={`max-w-full object-contain rounded-lg ${
+              viewMode === "side" ? "max-h-[55vh]" : "max-h-[70vh]"
+            }`}
+          />
+        </div>
+
+        {/* Box 2: Graded Canvas */}
+        <div
+          className={
+            viewMode === "side"
+              ? "relative rounded-xl overflow-hidden border border-sakura-500/30 bg-black/50 flex flex-col items-center justify-center p-2 w-full h-full"
+              : `w-full flex justify-center items-center ${
+                  isHoldingOriginal ? "opacity-0" : "opacity-100"
+                }`
+          }
+        >
+          {viewMode === "side" && (
+            <span className="absolute top-3 left-3 z-10 bg-sakura-600/90 backdrop-blur-md text-xs font-semibold text-white px-2.5 py-1 rounded-md shadow-lg">
+              보정 후 (After)
+            </span>
+          )}
+          <canvas
+            ref={gradedCanvasRef}
+            className={`max-w-full object-contain rounded-lg ${
+              viewMode === "side" ? "max-h-[55vh]" : "max-h-[70vh] pointer-events-none"
+            }`}
+          />
+        </div>
+
+        {/* Split Mode Handle and Labels */}
         {viewMode === "split" && (
-          <div
-            className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-ew-resize"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-          >
-            {/* Graded Image (Underneath, full view unless hold active) */}
-            <div
-              className={`w-full flex justify-center items-center ${
-                isHoldingOriginal ? "opacity-0" : "opacity-100"
-              }`}
-            >
-              <canvas
-                ref={gradedCanvasRef}
-                className="max-w-full max-h-[70vh] object-contain rounded-lg pointer-events-none"
-              />
-            </div>
-
-            {/* Original Image (Clipped by slider position or shown 100% on hold) */}
-            <div
-              className="absolute inset-0 flex justify-center items-center pointer-events-none overflow-hidden"
-              style={{
-                clipPath: isHoldingOriginal
-                  ? "inset(0% 0% 0% 0%)"
-                  : `inset(0% ${100 - sliderPos}% 0% 0%)`,
-              }}
-            >
-              <canvas
-                ref={originalCanvasRef}
-                className="max-w-full max-h-[70vh] object-contain rounded-lg"
-              />
-            </div>
-
-            {/* Split Handle & Line */}
+          <>
             {!isHoldingOriginal && (
               <div
-                className="absolute top-0 bottom-0 pointer-events-none"
+                className="absolute top-0 bottom-0 pointer-events-none z-20"
                 style={{ left: `${sliderPos}%` }}
               >
                 <div className="w-0.5 h-full bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.7)]" />
@@ -160,48 +187,23 @@ export const CompareSlider: React.FC<CompareSliderProps> = ({
               </div>
             )}
 
-            {/* Labels */}
             {!isHoldingOriginal && (
               <>
-                <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold text-slate-300 pointer-events-none border border-white/10">
+                <div className="absolute bottom-4 left-4 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold text-slate-300 pointer-events-none border border-white/10">
                   원본 (Before)
                 </div>
-                <div className="absolute bottom-4 right-4 bg-sakura-600/80 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold text-white pointer-events-none border border-sakura-300/30">
+                <div className="absolute bottom-4 right-4 z-20 bg-sakura-600/80 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold text-white pointer-events-none border border-sakura-300/30">
                   보정 후 (After)
                 </div>
               </>
             )}
 
             {isHoldingOriginal && (
-              <div className="absolute top-4 bg-amber-500/90 text-black px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-lg">
+              <div className="absolute top-4 z-20 bg-amber-500/90 text-black px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-lg">
                 원본 사진 확인 중
               </div>
             )}
-          </div>
-        )}
-
-        {/* View Mode: Side by Side */}
-        {viewMode === "side" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full p-3">
-            <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-black/50 flex flex-col items-center">
-              <span className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-md text-xs font-semibold text-slate-300 px-2.5 py-1 rounded-md border border-white/10">
-                원본 (Before)
-              </span>
-              <canvas
-                ref={originalCanvasRef}
-                className="max-w-full max-h-[60vh] object-contain"
-              />
-            </div>
-            <div className="relative rounded-xl overflow-hidden border border-sakura-500/30 bg-black/50 flex flex-col items-center">
-              <span className="absolute top-3 left-3 z-10 bg-sakura-600/90 backdrop-blur-md text-xs font-semibold text-white px-2.5 py-1 rounded-md shadow-lg">
-                보정 후 (After)
-              </span>
-              <canvas
-                ref={gradedCanvasRef}
-                className="max-w-full max-h-[60vh] object-contain"
-              />
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>

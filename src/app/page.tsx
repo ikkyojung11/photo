@@ -126,6 +126,19 @@ export default function Home() {
     renderGradedImage(filterConfig);
   }, [filterConfig, renderGradedImage]);
 
+  // Re-ensure rendering when viewMode changes
+  useEffect(() => {
+    if (imageElementRef.current && originalCanvasRef.current && gradedCanvasRef.current) {
+      const origCanvas = originalCanvasRef.current;
+      const img = imageElementRef.current;
+      const origCtx = origCanvas.getContext("2d");
+      if (origCtx && origCanvas.width > 0 && origCanvas.height > 0) {
+        origCtx.drawImage(img, 0, 0, origCanvas.width, origCanvas.height);
+      }
+      renderGradedImage(filterConfig);
+    }
+  }, [viewMode, filterConfig, renderGradedImage]);
+
   // One-click Preset selection
   const handleSelectPreset = (preset: PresetItem) => {
     setActivePresetId(preset.id);
